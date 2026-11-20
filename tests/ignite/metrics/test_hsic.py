@@ -109,6 +109,24 @@ def test_compute(n_times, sigma_x: float, sigma_y: float, test_case: tuple[Tenso
     assert pytest.approx(expected_hsic, abs=2e-5) == hsic.compute()
 
 
+@pytest.mark.parametrize("sigma_x, sigma_y", [(-1.0, -1.0), (5.0, 5.0)])
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_compute_half_precision(dtype, sigma_x, sigma_y, available_device):
+    X = torch.arange(50, dtype=torch.float32).reshape(10, 5).to(available_device)
+    Y = torch.sin(X * torch.pi * 2 / 50)
+
+    hsic = HSIC(sigma_x=sigma_x, sigma_y=sigma_y, device=available_device)
+    hsic.update((X, Y))
+    expected = hsic.compute()
+
+    hsic = HSIC(sigma_x=sigma_x, sigma_y=sigma_y, device=available_device)
+    hsic.update((X.to(dtype), Y.to(dtype)))
+    res = hsic.compute()
+
+    assert math.isfinite(res)
+    assert pytest.approx(expected, rel=1e-2) == res
+
+
 def test_accumulator_detached(available_device):
     hsic = HSIC(device=available_device)
     assert hsic._device == torch.device(available_device)
