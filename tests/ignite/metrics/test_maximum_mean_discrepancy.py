@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pytest
 import torch
@@ -94,6 +96,40 @@ def test_compute(n_times, test_case: tuple[Tensor, Tensor, float, int], availabl
 
     assert isinstance(res, float)
     assert pytest.approx(np_res, abs=1e-4) == res
+
+
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_compute_half_precision(dtype, available_device):
+    torch.manual_seed(0)
+    x = (torch.randn(40, 10) - 2.0).to(available_device)
+    y = (torch.randn(40, 10) + 2.0).to(available_device)
+
+    mmd = MaximumMeanDiscrepancy(var=10.0, device=available_device)
+    mmd.update((x, y))
+    expected = mmd.compute()
+
+    mmd = MaximumMeanDiscrepancy(var=10.0, device=available_device)
+    mmd.update((x.to(dtype), y.to(dtype)))
+    res = mmd.compute()
+
+    assert math.isfinite(res)
+    assert pytest.approx(expected, rel=1e-2) == res
+
+    # The squared norms in x @ x.T exceed the float16 maximum of 65504 and overflow.
+    torch.manual_seed(3)
+    x = (torch.randn(8, 512) * 100.0).to(available_device)
+    y = (torch.randn(8, 512) * 100.0).to(available_device)
+
+    mmd = MaximumMeanDiscrepancy(var=1e6, device=available_device)
+    mmd.update((x, y))
+    expected = mmd.compute()
+
+    mmd = MaximumMeanDiscrepancy(var=1e6, device=available_device)
+    mmd.update((x.to(dtype), y.to(dtype)))
+    res = mmd.compute()
+
+    assert math.isfinite(res)
+    assert pytest.approx(expected, rel=1e-2) == res
 
 
 def test_accumulator_detached(available_device):

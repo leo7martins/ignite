@@ -82,6 +82,8 @@ class MaximumMeanDiscrepancy(Metric):
 
     .. versionchanged:: 0.5.1
         ``skip_unrolling`` argument is added.
+    .. versionchanged:: 0.6.0
+        Metric is computed in float32 for float16 and bfloat16 inputs.
     """
 
     _state_dict_all_req_keys = ("_xx_sum", "_yy_sum", "_xy_sum", "_num_batches")
@@ -106,6 +108,12 @@ class MaximumMeanDiscrepancy(Metric):
     @reinit__is_reduced
     def update(self, output: Sequence[torch.Tensor]) -> None:
         x, y = output[0].detach(), output[1].detach()
+
+        if x.dtype in (torch.float16, torch.bfloat16):
+            x = x.float()
+        if y.dtype in (torch.float16, torch.bfloat16):
+            y = y.float()
+
         if x.shape != y.shape:
             raise ValueError(f"x and y must be in the same shape, got {x.shape} != {y.shape}.")
 
